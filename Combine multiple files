@@ -1,0 +1,72 @@
+##########################exmaine whether the reporter are lady or men #################
+  library(foreign)
+  for (f in filelist) {
+    
+    print(f)
+    
+    temp=read.table(f)
+    temp=temp[!temp$V4=="--",]
+    temp2=temp[temp$V2 %in% c("Y"),]
+    
+    a=dim(temp2)[1]
+    if(a==0){print("its lady")}else{print("it's a boy")}
+  }
+  
+######## exmaine whether the reporter are lady or men with erro tolerance################
+  
+  filelist = list.files(pattern="*.txt")
+  length(filelist)
+  genderresult <- data.frame(
+    filename=character(),
+    gender=character()
+  )
+  de=data.frame("f","F")
+  names(de)=names(genderresult)
+  genderresult=rbind(genderresult,de)
+ 
+  for (f in filelist) {
+    print(match(f,filelist)/1000)
+    tryCatch({
+      
+      temp=read.table(f)
+      temp=as.data.frame(temp,quote=F)  #remove the "" from illumina files
+      temp=temp[!temp$V4=="--",]
+      temp2=temp[temp$V2 %in% c("Y"),] # extract Y chromesome
+      temp3=temp[temp$V2 %in% c("X"),] #extract x chromesome
+             
+      a=dim(temp2)[1] #number of mutation in Y
+      b=dim(temp3)[1] # number of mutation in X
+      if(a==0 & b!=0){
+        de=data.frame(f,"F")
+        names(de)=names(genderresult)
+        genderresult=rbind(genderresult,de)
+        #print("its lady")
+        }
+      if((a!=0)){  
+        de=data.frame(f,"M")
+        names(de)=names(genderresult)
+        genderresult=rbind(genderresult,de)
+        #print("it's a boy")
+        }
+    }, 
+    error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
+    
+  }
+  write.csv(genderresult,'genderresult.csv')
+###########test########################################################
+  
+  de=data.frame("f","F")
+  names(de)=names(genderresult)
+  genderresult=rbind(genderresult,de)
+
+########test of count function############################################
+  
+  filea=read.table("503.23andme.txt.274")
+  fileb=read.table("17.23andme.txt.143")
+  common <- intersect(filea$V1, fileb$V1)  
+  sum(filea[common,]$count)
+  
+  data.frame1[common,] # give you common rows in data frame 1  
+  data.frame2[common,]
+  
+  
