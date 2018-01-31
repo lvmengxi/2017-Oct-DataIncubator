@@ -1,0 +1,168 @@
+  gc()
+
+##read phenotype results
+
+  totalDat=read.csv("total Phenotype data.csv",stringsAsFactors=FALSE)
+  
+## separate female and male results
+  totalDat=totalDat[totalDat$gender=="F",] # for female
+  #totalDat=totalDat[totalDat$gender=="M",] # for male
+  
+  
+## transform the data frame into matrix  
+  totalDat=as.matrix(totalDat)
+  class(totalDat)
+  head(totalDat)
+  
+## replace NA with 0
+  totalDat[is.na(totalDat)] <- 0
+  totalDat[!totalDat==0] <-1
+  totalDat=apply(totalDat,2,as.numeric)
+  
+## replace 
+  totalDat=totalDat[,-c(1,2)] ## remove the user ID and gender
+  dim(totalDat)
+  
+  totalDat1=totalDat[,colSums(totalDat)>dim(totalDat)[1]/20] 
+  dim(totalDat1)
+  head(totalDat1)
+  class(totalDat1)
+
+## Clustering analysis
+  library(scatterplot3d) 
+  library(NbClust)
+  library(fpc)
+  library(cluster)
+  library(mclust)
+  
+  mydata=t(totalDat1)
+  head(mydata)
+
+#  Hierarchical Clustering
+  
+  d <- dist(mydata, method = "euclidean") # distance matrix
+  fit <- hclust(d, method="ward.D") 
+  plot(fit,cex=1.5) # display dendogram
+  groups <- cutree(fit, k=5) # cut tree into 5 clusters
+  # draw dendogram with red borders around the 5 clusters 
+  rect.hclust(fit, k=5, border="blue")
+  
+  #compare list of female and male
+  mlist=fit$labels
+  flist=fit$labels
+  
+  intersect(mlist,flist) #find the common
+  length(intersect(mlist,flist))
+  
+  setdiff(mlist,flist) #find the unique in male
+  length(setdiff(mlist,flist))
+  
+  setdiff(flist,mlist) #find the unique in female
+  length(setdiff(flist,mlist))
+  
+  
+  library(VennDiagram)
+  grid.newpage()
+  draw.pairwise.venn(36, 29, 26, category = c("Male", "Female"), lty = rep("blank", 2), 
+                     fill = c("light blue", "pink"))
+
+  ############ set up data for train and test #########
+    dat=as.data.frame(totalDat)
+    dat$gender=as.factor(totalDat$gender)
+    
+    dat=dat[!is.na(dat$gender),]
+    head(dat)
+    attach(dat)
+    
+    train = sample(1:nrow(dat), nrow(dat)/1.5)
+  
+  ############ decision tree###########################
+  library (tree)
+
+  #build tree
+  tree.wakeup = tree(dat$gender ~., data = dat)
+  summary (tree.wakeup)
+  par(mfrow=c(1,1))
+  plot(tree.wakeup )
+  text(tree.wakeup, pretty =0, cex=.5)
+  
+  
+  set.seed (2)
+  train=sample (1: nrow(dat), nrow(dat)/1.5)
+
+  tree.wakeup =tree(gender ~. -gender, data=dat,subset =train )
+  tree.wakeup
+  tree.pred=predict(tree.wakeup ,dat.test ,type="class") #the argument type="class" instructs R to return the  class prediction
+  table(tree.pred, High.test)
+  
+  
+  #prune tree
+  set.seed (100)
+  cv.carseats =cv.tree(tree.wakeup ,FUN=prune.misclass ) #performs cross-validation in order to determine the optimal level of tree complexity; FUN=prune.misclass  indicates that we want the classification error rate to guide the cross-validation and pruning process, the default is deviance.
+  cv.carseats   #dev corresponds to the cross-validation error rate in this instance
+  
+  
+  par(mfrow =c(1,2))
+  plot(cv.carseats$size ,cv.carseats$dev ,type="b")  #plot tree sizes versus their correspongding deviations to select the optimal tree (smallest dev)
+  plot(cv.carseats$k ,cv.carseats$dev ,type="b") #plot different alpha values versus the correspongding deviations of the trees built based the alpha values, to select the optimal tree (smallest dev)
+  
+  
+  prune.carseats =prune.misclass(tree.wakeup, best =15)  #build the optimal tree select by CV; best=9 means that the number of the terminal nodes of the optimal tree is 9.
+  par(mfrow=c(1,1))
+  plot(prune.carseats)  #plot the optimal tree
+  text(prune.carseats, pretty =0)
+  
+  
+  #predict testing set
+  tree.pred=predict(prune.carseats, dat.test, type="class")
+  table(tree.pred ,High.test) #improve error rate and better intepretation
+
+  ############ random forest###########################
+  
+  library(randomForest)
+  set.seed(1)
+  
+  
+  bag.boston=randomForest(gender ~., data=dat,
+                          importance=TRUE,na.action=na.omit,do.trace=100,ntree=1000)
+
+  yhat.bag = predict(bag.boston,newdata=dat[-train,],type="class")
+  table(yhat.bag ,dat[-train,"gender"])
+  importance(bag.boston)
+  
+  library(randomForest)
+  library(reprtree)
+  reprtree:::plot.getTree(bag.boston)
+  
+  library(party)
+  cforest(gender ~., data=dat,controls=cforest_control(mtry=2, mincriterion=0))
+  
+##########SVM #############
+  library(e1071)
+  
+  svmfit=svm(gender~., data=dat[train,], kernel="radial", cost=10,gamma=1,scale=FALSE)
+  summary(svmfit)
+  print(svmfit)
+  plot(svmfit,dat)
+  
+  # #plot the result
+  # cplus<-dat
+  # cplus$Oth<-rnorm(nrow(dat))
+  # 
+  # plot(svmfit, cplus, Dim.10~Oth) #Ok
+  # plot(svmfit, cplus, Dim.1~Dim.10)
+  
+  ## ??? Finding optimal tuning parameter:
+  set.seed(10111)
+  tune.out=tune(svm,gender~., data=dat, kernel="radial",ranges=list(cost=c(0.001, 0.01, 0.1, 1,5,10,100,200)),scale=F)
+  summary(tune.out)
+  bestmod=tune.out$best.model
+  summary(bestmod)
+  
+  svmfit2=svm(gender~., data=dat[train,], kernel="radial", cost=100,gamma=0.005347594,scale=F)
+  plot(svmfit2,dat,chrom_sex~Ageyoustartedwearingglasses)
+  
+  pred.te=predict(svmfit2,newdata=dat[-train,])
+  table(pred.te,dat[-train,"gender"])
+  
+  
