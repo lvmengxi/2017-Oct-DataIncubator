@@ -1,0 +1,393 @@
+#############wake up preference
+
+  setwd("C:/Dropbox/2017 MS STAT/2017 Data incubator application/openSNA")
+  datYes=read.csv("early riser_regular.csv")
+  datNo=read.csv("Late Riser_regular.csv")
+  datMiddle=read.csv("Middle Depression MT.csv")
+
+#remove the unnecessary columnes
+  head(datYes[1:2,1:10])
+  head(datNo[1:2,1:10])
+  head(datMiddle[1:2,1:10])
+  
+  datYes1=datYes[,c(-1,-3)]
+  head(datYes1[1:2,1:10])
+  
+  datNo1=datNo[,c(-1,-3)]
+  head(datNo1[1:20,1:10])
+
+##
+  datMiddle1=datMiddle[,c(-1,-3)]
+  head(datMiddle1[1:2,1:10])
+  
+#tranform the data
+  dat1=t(datYes1)
+  dat2=t(datNo1)
+  dat3=t(datMiddle1)
+  
+  colnames(dat1)=dat1[1,]
+  colnames(dat2)=dat2[1,]
+  colnames(dat3)=dat3[1,]
+  
+  dat1=dat1[-1,]
+  dat2=dat2[-1,]
+  dat3=dat3[-1,]
+  head(dat1[1:4,1:9])
+  head(dat2[1:4,1:9])
+  head(dat3[1:4,1:9])
+  
+  dim(dat1)
+  dim(dat2)
+  dim(dat3)
+
+#####remove the SNP which less than 90% people have
+  dat1_r=as.data.frame(dat1[,colSums(!is.na(dat1)) >  83*0.95])
+  dat2_r=as.data.frame(dat2[,colSums(!is.na(dat2)) > 136*0.95])
+  dat3_r=dat3[,colSums(!is.na(dat3)) > 18*0.7]
+  
+  dim(dat1_r)
+  dim(dat2_r)
+  dim(dat3_r)
+  
+  dat1_rr=Filter(function(x) length(unique(x))>1, dat1_r)
+  dat2_rr=Filter(function(x) length(unique(x))>1, dat2_r)
+  
+  dim(dat1_rr)
+  dim(dat2_rr)
+
+  head(dat1[1:2,4:9])
+  head(dat2[1:2,4:9])
+  head(dat3_r[1:2,1:9])
+
+######## Combine two data set ################
+  combData=merge(t(dat1_r),t(dat2_r),by=0,all.y=T,all.x=T)  #combine dat1 and dat2
+  dim(combData)
+  head(combData[1:2,1:9])
+  rownames(combData)=combData[,1]
+  combData=combData[,-1]
+  head(combData[1:2,1:19])
+  combData[combData=="--"]<- NA
+  dim(combData)
+  head(combData[1:19,1:19])
+  
+  combData1_1=combData[rowSums(!is.na(combData)) > 219*0.972,]  # remove rows
+  dim(combData1_1)
+  combData2=combData1_1[,colSums(!is.na(combData1_1)) > 54407*0.9] # remove columnes
+  dim(combData2)
+  
+  #combData2=apply(combData2, 2, as.character)
+  combData2[is.na(combData2)] <- "--"
+  head(combData2[1:2,1:9])
+  
+  colnames(combData2)
+  
+  lable=c(rep("1", 79),rep("0",134)) # add label
+  dat=data.frame(t(combData2),lable) 
+  dim(dat)
+  head(dat[1:2,2100:2133])
+  
+  write.csv(dat,"Combined_Wakeup preference_regular.csv")
+  
+  
+################   whether or not to combine the sometime group#############################################
+  combData1=merge(combData,t(dat3_r),by=0,all.y=T,all.x=T) #combine dat 1, 2 , and 3
+  head(combData1[1:2,1:9])
+  rownames(combData1)=combData1[,1]
+  combData1=combData1[,-1]
+  head(combData1[1:2,1:9])
+  
+  
+  combData1[combData1=="--"]<- NA
+  dim(combData1)
+  head(combData1[1:2,1:9])
+  
+  combData1_1=combData1[rowSums(!is.na(combData1)) > 97*0.6,]
+  combData2=combData1_1[,colSums(!is.na(combData1_1)) > 2261*0.6]
+  dim(combData2)
+  
+  #combData2=apply(combData2, 2, as.character)
+  combData2[is.na(combData2)] <- "--"
+  head(combData2[1:2,1:9])
+  
+  colnames(combData2)
+  
+  lable=c(rep("1",37),rep("0",62-38),rep("2",75-61)) # add label
+  dat=data.frame(t(combData2),lable) 
+  dim(dat)
+  head(dat[1:2,2100:2133])
+  
+  write.csv(dat,"Combined_Depression_MT_3groups.csv")
+  
+################ MCA analysis ##################################
+  
+#install.packages(c("FactoMineR", "factoextra"))
+  library("FactoMineR")
+  library("factoextra")
+  
+##read data set
+  dat=read.csv("Combined_Depression_MT_2groups.csv")
+  dim(dat)
+  dat1=dat[,-c(1,2134)]
+  dim(dat1)
+  head(dat1[1:10,2130:2132])
+  
+  dat=read.csv("mapped SNP.csv") # read the mapped data
+  dim(dat)
+  head(dat[1:10,c(1,1000:1025)])
+  dat1=dat[,-c(1,1025)]
+  dim(dat1)
+  head(dat1[1:10,1020:1023])
+  
+  ## MCA analysis
+  res.mca2=MCA(dat1, ncp =200,graph = T)
+  
+  m=as.data.frame(res.mca2$ind$coord)
+  m$lable=as.factor(lable)
+  lable=c(rep(1,79),rep(0,134)) # add label to wakeup people
+  head(m)
+  
+  require(ggplot2)
+  qplot(m$`Dim 13`, m$`Dim 2`, data = m, colour = lable)
+  
+  fviz_screeplot(res.mca2, addlabels = TRUE)
+  summary(res.mca2)
+  
+  fviz_mca_var(res.mca2, select.var= list(cos2 = 10))
+  fviz_contrib(res.mca2, choice ="var", axes = 1,top=50)
+  fviz_contrib(res.mca2, choice ="ind", axes = 1, top = 20)
+  
+  write.csv(m,"m-20_1.csv")
+  
+################ SVM ###################
+  #install.packages("e1071")
+  library(e1071)
+  
+  #read data
+  dat=read.csv("m-40-wakeup all.csv")
+  dim(dat)
+  head(dat)
+  dat$y=as.factor(dat$y)
+  
+  dat1=dat[1:142,c(1,11,2)]
+  head(dat1)
+  dim(dat1)
+  
+  ## use the dataframe from MCA
+  m$lable=lable
+  head(m)
+  attach(dat)
+  dat=data.frame(x=m[,1:20],y=as.factor(m$lable))
+  
+##set test and train data
+  set.seed(0)
+  train = sample(nrow(dat1), nrow(dat1)/2) 
+  
+  ## radial SVM 
+  svmfit=svm(y~., data=dat1[-train,], kernel="radial", cost=10,gamma=1,scale=FALSE)
+  summary(svmfit)
+  print(svmfit)
+  plot(svmfit,dat1)
+  
+  # #plot the result
+  # cplus<-dat
+  # cplus$Oth<-rnorm(nrow(dat))
+  # 
+  # plot(svmfit, cplus, Dim.10~Oth) #Ok
+  # plot(svmfit, cplus, Dim.1~Dim.10)
+  
+  ## ??? Finding optimal tuning parameter:
+  set.seed(10111)
+  tune.out=tune(svm,y~., data=dat1, kernel="radial",ranges=list(cost=c(0.001, 0.01, 0.1, 1,5,10,100,200)),scale=F)
+  summary(tune.out)
+  bestmod=tune.out$best.model
+  summary(bestmod)
+  
+  svmfit2=svm(y~., data=dat1[train,], kernel="radial", cost=5,gamma=0.5,scale=F)
+  plot(svmfit2,dat1,ylim=range(-0.01,0.02),xlim=range(-2:2))
+  #plot(svmfit, cplus, Dim.10~Dim.1)
+  
+  pred.te=predict(svmfit2,newdata=dat1[train,])
+  
+  table(pred.te,	dat1[-train,"y"])
+  
+  ## test the model
+  
+dim(dat1)
+  
+  # ROC Curves
+  library(ROCR)
+  rocplot=function(pred, truth, ...){
+    predob = prediction(pred, truth)
+    perf = performance(predob, "tpr", "fpr")
+    plot(perf,...)}
+  
+  svmfit.opt=svm(y~., data=dat1[train,], kernel="radial",cost=0.001,gamma=0.025,decision.values=T)
+  
+  fitted=attributes(predict(svmfit.opt,dat1[train,],decision.values=TRUE))$decision.values
+  
+  par(mfrow=c(1,2))
+  rocplot(fitted,dat1[train,"y"],main="Training Data")
+  
+  svmfit.flex=svm(y~., data=dat1[train,], kernel="radial",gamma=50,
+                  cost=1, decision.values=T)
+  
+  fitted=attributes(predict(svmfit.flex,dat1[train,],decision.values=T))$decision.values
+  
+  rocplot(fitted,dat1[train,"y"],add=T,col="red")
+  
+  fitted=attributes(predict(svmfit.opt,dat1[-train,],decision.values=T))$decision.values
+  rocplot(fitted,dat1[-train,"y"],main="Test Data")
+  
+  fitted=attributes(predict(svmfit.flex,dat1[- train,],decision.values=T))$decision.values
+  rocplot(fitted,dat1[-train,"y"],add=T,col="red")
+  
+  
+################ decision tree ###########################
+  
+  ##read data
+  gc()
+  combDat=read.csv("Combined_Depression_XY_3groups.csv")
+  dim(combDat)
+  head(combDat[1:2,14119:14126])
+  combDat1=combDat
+  rownames(combDat1)=combDat1[,1]
+  combDat2=combDat1[,-1]
+  dim(combDat2)
+  head(combDat2[1:2,14119:14125])
+  
+  ## decision tree
+  library (tree)
+  dat$lable=as.factor(dat$lable)
+  dim(dat)
+  
+  #head(dat[,c(1,291630:291638)])
+  
+  attach(dat)
+  dat=apply(dat,2,as.character)
+  dat[is.na(dat)]<-"unknown"
+  dat[dat %in% c("AA","CC","GG","TT")]<-"same"
+  dat[!dat %in% c("AA","CC","GG","TT","0","1")]<-"SNP"
+  
+  
+  dat=as.data.frame(dat1)
+  
+  #build tree
+  dat=dat1
+  set.seed (2)
+  train=sample (1: nrow(dat), 100)
+  dat.test=dat [-train ,]
+  High.test=dat$y[-train ]
+  
+  tree.wakeup =tree(y ~., dat ,subset =train)
+  tree.wakeup
+  plot(tree.wakeup )
+  text(tree.wakeup, pretty =0, cex=.5)
+  tree.pred=predict(tree.wakeup ,newdata=dat[-train,] ,type="class") #the argument type="class" instructs R to return the  class prediction
+  table(tree.pred, High.test)
+  
+  
+  #prune tree
+  set.seed (100)
+  cv.carseats =cv.tree(tree.wakeup ,FUN=prune.misclass ) #performs cross-validation in order to determine the optimal level of tree complexity; FUN=prune.misclass  indicates that we want the classification error rate to guide the cross-validation and pruning process, the default is deviance.
+  cv.carseats   #dev corresponds to the cross-validation error rate in this instance
+  
+  
+  par(mfrow =c(1,2))
+  plot(cv.carseats$size ,cv.carseats$dev ,type="b")  #plot tree sizes versus their correspongding deviations to select the optimal tree (smallest dev)
+  plot(cv.carseats$k ,cv.carseats$dev ,type="b") #plot different alpha values versus the correspongding deviations of the trees built based the alpha values, to select the optimal tree (smallest dev)
+  
+  
+  prune.carseats =prune.misclass(tree.wakeup, best =15)  #build the optimal tree select by CV; best=9 means that the number of the terminal nodes of the optimal tree is 9.
+  par(mfrow=c(1,1))
+  plot(prune.carseats)  #plot the optimal tree
+  text(prune.carseats, pretty =0)
+  
+  
+  #predict testing set
+  tree.pred=predict(prune.carseats, dat.test, type="class")
+  table(tree.pred ,High.test) #improve error rate and better intepretation
+  
+  
+################ random forest
+  
+################ establish library data ########################### 
+  
+  library(gwascat)
+  data(gwrngs19)
+  gwrngs.emd <- as.data.frame(gwrngs19@elementMetadata)
+  ref=as.data.frame(gwrngs.emd[,c("Strongest.SNP.Risk.Allele", "SNPs")])
+  colnames(ref)
+  
+  f=dat[,names(dat)%in% ref$SNPs]
+  head(f[1:10,1:10])
+  
+  lable=c(rep("1",79),rep("0",214-80))
+  f=data.frame(f,lable)
+  dim(f)
+  head(f[1:4,c(1,1020:1024)])
+  f[is.na(f)] <- "--"
+  dat1=Filter(function(x) length(unique(x)) >1  , f)  # remove the rows with replicate
+  dim(dat1)
+  head(dat1[1:4,c(1,1020:1024)])
+  
+  write.csv(dat1,"mapped SNP.csv")
+  
+
+  
+  #LDA
+  library(MASS)
+  r2 <- lda(formula = lable ~ ., 
+           data = as.data.frame(dat1),CV = TRUE
+           )
+
+  head(r2$class) 
+
+################ random forest ############
+  library(randomForest)
+  
+## read data
+  dat=read.csv("mapped SNP.csv")
+  dim(dat)
+  head(dat[1:2,c(1,1025)])
+
+## if data is ready, skip the preivous step  
+  dat[is.na(dat)] <- "--"   # NA will be transformed to "--"
+  dat1=Filter(function(x) length(unique(x)) >6  , dat)  # remove the rows with replicate
+  
+  dat1$lable=as.factor(dat1$lable)
+  dim(dat1)
+  head(dat1[1:10,c(1,17)])
+## Use the MCA data
+  lable=c(rep("1",79),rep("0",214-80)) # add label to wakeup people
+  lable=c(rep("1",37),rep("0",24)) # add label to depression people
+  
+  length(lable)
+  dat1=as.data.frame(m)
+  
+
+
+## separate train and testing data  
+  dat1$lable=as.factor(dat1$lable)
+  dat1=dat[,]
+  head(dat1[1:10,1:10])
+  
+  attach(dat1)
+  dat1=as.data.frame(dat1)
+  dat1$lable=as.factor(dat1$lable)
+  set.seed(1)
+  train = sample(1:nrow(dat1), nrow(dat1)*2/3) 
+
+  
+## random forest  
+  bag.boston=randomForest(lable ~., dat=dat1[train,],
+                          importance=TRUE)
+  bag.boston
+  plot(bag.boston)
+  
+## predict
+  yhat.bag = predict(bag.boston,newdata=dat1[-train,],type="class")
+  table(yhat.bag ,dat1[-train,]$lable)
+  #importance(bag.boston)
+  
+
+  
